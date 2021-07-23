@@ -14,14 +14,11 @@ class RandNumRequest {
   }
 }
 
-export async function getRandomNumber(min: number, max: number) {
+export async function getRandomNumber(
+  min: number,
+  max: number
+): Promise<https.Result<number>> {
   const requestOpt = RandNumRequest.getRandomNumber(min, max);
   const response = await https.request<number>(requestOpt);
-
-  if (response.status === "FAILURE") {
-    console.log("cannot retrieve value");
-    console.log(response);
-  } else {
-    console.log("value is", response.body);
-  }
+  return response;
 }

@@ -1,3 +1,3 @@
 import { getRandomNumber } from "./request";
 
-getRandomNumber(1, 10);
+getRandomNumber(0, 1000000001);
