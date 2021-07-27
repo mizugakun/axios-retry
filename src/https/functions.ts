@@ -1,28 +1,43 @@
-import { Result, RequestConfig } from "./types";
-import * as rax from "retry-axios";
+import { Result, RequestConfig, RetryConfig } from "./types";
 import axios from "axios";
-import { getRandomNumber } from "../request";
 
-// Attach retry-axios
-rax.attach();
+export async function request<T>(
+  options: RequestConfig,
+  retryConfig?: RetryConfig
+): Promise<Result<T>> {
+  if (retryConfig === undefined) {
+    return makeRequest(options);
+  }
 
-export async function request<T>(options: RequestConfig): Promise<Result<T>> {
-  const retryConfig: rax.RetryConfig = {
-    retry: 3,
-    retryDelay: 100,
-    onRetryAttempt: (err) => {
-      const cfg = rax.getConfig(err);
-      console.log(`Retry attempt #${cfg?.currentRetryAttempt}`);
-    },
-  };
+  let res;
+  for (let i = 0; i <= retryConfig.retries; i++) {
+    res = await makeRequest<T>(options);
+    if (res.status === "SUCCESS" || i === retryConfig.retries) {
+      return res;
+    }
+    if (
+      res.statusCode! &&
+      retryConfig.retryStatusCodes.includes(res.statusCode)
+    ) {
+      options = await retryConfig.updateConfig(options);
+      await wait(retryConfig.delayMS);
+    } else {
+      break;
+    }
+  }
 
-  const raxOption: rax.RaxConfig = {
-    raxConfig: retryConfig,
-    ...options,
-  };
+  return res
+    ? res
+    : {
+        status: "FAILURE",
+        message: "fail to request",
+        statusCode: 502,
+      };
+}
 
+async function makeRequest<T>(options: RequestConfig): Promise<Result<T>> {
   try {
-    const response = await axios(raxOption);
+    const response = await axios(options);
     return {
       status: "SUCCESS",
       body: response.data,
@@ -37,4 +52,8 @@ export async function request<T>(options: RequestConfig): Promise<Result<T>> {
       statusCode: error.response?.status,
     };
   }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
